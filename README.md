@@ -1,7 +1,8 @@
 
 # Weather App Backend
 
-A Weather App Backend used to send current weather data, including forecast and weather history and weather alert. WeatherAPI provides weather data, including current, 14-days, future, and historical weather, as well as geo data, time zone information, and astronomy data.
+A Weather App Backend used to send current weather data, including forecast and weather history and weather alert. WeatherAPI provides weather data, including current, 14-day, future, and historical weather, as well as geo data, time zone information, and astronomy data.
+
 
 ## API Reference
 
