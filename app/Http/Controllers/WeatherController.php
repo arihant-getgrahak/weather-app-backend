@@ -2,94 +2,129 @@
 
 namespace App\Http\Controllers;
 
-use Http;
 use Illuminate\Http\Request;
-use Validator;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator;
 
 class WeatherController extends Controller
 {
     public function sendDataBasedOnLocation(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
             'city' => 'required',
             "state" => 'required',
-            "country" => 'required'
+            "country" => 'required',
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors());
+            return response()->json($validator->errors(), 400);
         }
 
-        $data = $this->getCoordinatefromCity($request->city, $request->state, $request->country);
+        // Check if latitude and longitude are cached
+        $lat = Cache::get('lat');
+        $long = Cache::get('long');
+        
+        if (!$lat || !$long) {
+            $data = $this->getCoordinatefromCity($request->city, $request->state, $request->country);
 
-        $res = $this->getWeather($data['lat'], $data['long']);
+            if (!$data) {
+                return response()->json(['error' => 'Unable to retrieve coordinates.'], 500);
+            }
 
+            $lat = $data['lat'];
+            $long = $data['long'];
 
-        return response()->json($res);
+            // Cache latitude and longitude for 4 hours
+            Cache::put('lat', $lat, now()->addHours(4));
+            Cache::put('long', $long, now()->addHours(4));
+        }
+
+        // Check if weather data is cached
+        $cachedWeather = Cache::get('weather');
+        
+        if ($cachedWeather) {
+            return response()->json($cachedWeather);
+        }
+
+        // Fetch weather data if not cached
+        $weatherData = $this->getWeather($lat, $long);
+
+        if (!$weatherData) {
+            return response()->json(['error' => 'Unable to retrieve weather data.'], 500);
+        }
+
+        // Cache weather data for 1 hour
+        Cache::put('weather', $weatherData, now()->addHours(1));
+
+        return response()->json($weatherData);
     }
 
-    public function getCoordinatefromCity(string $city, string $state, string $country)
+    private function getCoordinatefromCity(string $city, string $state, string $country)
     {
-
         $ninja_api_url = config("api.ninja_api_url");
         $ninja_api_key = config("api.ninja_api_key");
 
-        $lat = "";
-        $long = "";
-
         try {
-            $response = Http::withHeader(
-                'X-Api-Key',
-                $ninja_api_key
-            )->get("$ninja_api_url?city=$city&country=$country");
+            $response = Http::withHeaders([
+                'X-Api-Key' => $ninja_api_key,
+            ])->get("$ninja_api_url?city=$city&country=$country");
 
             foreach ($response->json() as $res) {
-                $validdata = $state;
-                if ($res['state'] == $validdata) {
-                    $lat = $res['latitude'];
-                    $long = $res['longitude'];
-                    $data = [
-                        "lat" => $lat,
-                        "long" => $long
+                if ($res['state'] === $state) {
+                    return [
+                        'lat' => $res['latitude'],
+                        'long' => $res['longitude'],
                     ];
-                    return $data;
                 }
             }
 
-        } catch (\Exception $e) {
-            echo "<pre>";
-            print_r($e);
-            echo "</pre>";
-        }
+            return null;
 
+        } catch (\Exception $e) {
+            // Log the exception or handle it as needed
+            return null;
+        }
     }
 
-    public function getWeather(string $lat, string $long)
+    private function getWeather(string $lat, string $long)
     {
         $api_base_url = config("api.api_base_url");
-        $wind_speed_80m = config("api.wind_speed_80m");
-        $wind_speed_10m = config("api.wind_speed_10m");
-        $precipitation = config("api.precipitation");
-        $precipitation_probability = config("api.precipitation_probability");
-        $relative_humidity = config("api.relative_humidity");
-        $temprature = config("api.temprature");
-        $visibility = config("api.visibility");
+        $parameters = [
+            config("api.temperature"),
+            config("api.relative_humidity"),
+            config("api.precipitation_probability"),
+            config("api.precipitation"),
+            config("api.visibility"),
+            config("api.wind_speed_10m"),
+            config("api.wind_speed_80m"),
+        ];
+
+        $dailyParams = [
+            'temperature_2m_max',
+            'temperature_2m_min',
+            'sunrise',
+            'sunset',
+            'uv_index_max',
+        ];
 
         try {
-
             $response = Http::withHeaders([
                 "Content-Type" => "application/json",
-            ])->get("$api_base_url?latitude=$lat&longitude=$long&hourly=$temprature,$relative_humidity,$precipitation_probability,$precipitation,$visibility,$wind_speed_10m,$wind_speed_80m&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&forecast_days=1&timezone=Asia%2FKolkata");
-
+            ])->get($api_base_url, [
+                'latitude' => $lat,
+                'longitude' => $long,
+                'hourly' => implode(',', $parameters),
+                'daily' => implode(',', $dailyParams),
+                'forecast_days' => 1,
+                'timezone' => 'Asia/Kolkata',
+            ]);
 
             return $response->json();
 
         } catch (\Exception $e) {
-            echo "<pre>";
-            print_r($e);
-            echo "</pre>";
+            // Log the exception or handle it as needed
+            return null;
         }
-
     }
 }

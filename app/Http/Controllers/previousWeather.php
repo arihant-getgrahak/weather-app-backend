@@ -106,3 +106,17 @@ class previousWeather extends Controller
 
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

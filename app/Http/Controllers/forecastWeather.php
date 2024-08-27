@@ -10,40 +10,52 @@ use Illuminate\Support\Facades\Cache;
 class forecastWeather extends Controller
 {
     public function fetchDataBasedOnLocation(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'city' => 'required',
-            "state" => 'required',
-            "country" => 'required'
-        ]);
+{
+    // Validate incoming request data
+    $validator = Validator::make($request->all(), [
+        'city' => 'required',
+        'state' => 'required',
+        'country' => 'required'
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors());
-        }
-
-        $data="";
-        if(Cache::has('lat') && Cache::has('long')){
-            $data = [
-                'lat' = Cache::get('lat');
-                'long' = Cache::get('long');
-            ]
-        }
-        else{
-            $data = $this->getCoordinatefromCity($request->city, $request->state, $request->country);
-            Cache::add('lat', $data['lat'], now()->addHours(4));
-            Cache::add('long', $data['long'], now()->addHours(4));
-        }
-        if(Cache::has('forecast')){
-            $value = Cache::get('forecast');
-            return response()->json($value);
-        }
-        else{
-            $res = $this->getWeather($data['lat'], $data['long']);
-            Cache::add('forecast', $res, now()->addHours(1));
-            return response()->json($res);
-        }
-
+    if ($validator->fails()) {
+        return response()->json($validator->errors());
     }
+
+    // Retrieve coordinates from cache or fetch and cache them
+    $lat = Cache::get('lat');
+    $long = Cache::get('long');
+
+    if (!$lat || !$long) {
+        $data = $this->getCoordinatefromCity($request->city, $request->state, $request->country);
+
+        if (!$data) {
+            return response()->json(['error' => 'Unable to retrieve coordinates.'], 500);
+        }
+
+        $lat = $data['lat'];
+        $long = $data['long'];
+
+        Cache::put('lat', $lat, now()->addHours(4));
+        Cache::put('long', $long, now()->addHours(4));
+    }
+
+    // Retrieve forecast from cache or fetch and cache it
+    $forecast = Cache::get('forecast');
+
+    if (!$forecast) {
+        $forecast = $this->getWeather($lat, $long);
+
+        if (!$forecast) {
+            return response()->json(['error' => 'Unable to retrieve weather data.'], 500);
+        }
+
+        Cache::put('forecast', $forecast, now()->addHours(1));
+    }
+
+    return response()->json($forecast);
+}
+
     public function getCoordinatefromCity(string $city, string $state, string $country)
     {
 
