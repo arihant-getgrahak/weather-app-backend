@@ -20,12 +20,28 @@ class forecastWeather extends Controller
             return response()->json($validator->errors());
         }
 
-        $data = $this->getCoordinatefromCity($request->city, $request->state, $request->country);
+        $data="";
+        if(Cache::has('lat') && Cache::has('long')){
+            $data = [
+                'lat' = Cache::get('lat');
+                'long' = Cache::get('long');
+            ]
+        }
+        else{
+            $data = $this->getCoordinatefromCity($request->city, $request->state, $request->country);
+            Cache::add('lat', $data['lat'], now()->addHours(4));
+            Cache::add('long', $data['long'], now()->addHours(4));
+        }
+        if(Cache::has('forecast')){
+            $value = Cache::get('forecast');
+            return response()->json($value);
+        }
+        else{
+            $res = $this->getWeather($data['lat'], $data['long']);
+            Cache::add('forecast', $res, now()->addHours(1));
+            return response()->json($res);
+        }
 
-        $res = $this->getWeather($data['lat'], $data['long']);
-
-
-        return response()->json($res);
     }
     public function getCoordinatefromCity(string $city, string $state, string $country)
     {
@@ -79,11 +95,7 @@ class forecastWeather extends Controller
 
             return $response->json();
 
-        } catch (\Exception $e) {
-            echo "<pre>";
-            print_r($e);
-            echo "</pre>";
-        }
+        } 
 
     }
 }
