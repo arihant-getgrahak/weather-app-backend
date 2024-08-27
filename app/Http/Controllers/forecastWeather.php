@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Validator;
 use Http;
+use Illuminate\Support\Facades\Cache;
 
 class forecastWeather extends Controller
 {
@@ -95,7 +96,11 @@ class forecastWeather extends Controller
 
             return $response->json();
 
-        } 
+        } catch (\Exception $e) {
+            echo "<pre>";
+            print_r($e);
+            echo "</pre>";
+        }
 
     }
 }

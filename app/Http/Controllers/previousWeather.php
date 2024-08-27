@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Validator;
 use Http;
+use Illuminate\Support\Facades\Cache;
 
 class previousWeather extends Controller
 {
@@ -20,12 +21,30 @@ class previousWeather extends Controller
             return response()->json($validator->errors());
         }
 
-        $data = $this->getCoordinatefromCity($request->city, $request->state, $request->country);
+        $data = "";
 
-        $res = $this->getWeather($data['lat'], $data['long']);
+        if (Cache::has('lat') && Cache::has('long')) {
+            $data = [
+                "lat" => Cache::get('lat'),
+                "long" => Cache::get('long')
+            ];
+        }
+        else{
+            $data = $this->getCoordinatefromCity($request->city, $request->state, $request->country);
+            Cache::add("lat", $data['lat'], now()->addHours(4));
+            Cache::add("long", $data['long'], now()->addHours(4));
+        }
+        if (Cache::has('history')) {
+            $value = Cache::get('history');
+            return response()->json($value);
+        }
+        else{
+            $res = $this->getWeather($data['lat'], $data['long']);
+            Cache::add('history', $res, now()->addHours(1));
+            return response()->json($res);
+        }
 
 
-        return response()->json($res);
     }
     public function getCoordinatefromCity(string $city, string $state, string $country)
     {
