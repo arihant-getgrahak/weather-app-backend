@@ -95,6 +95,43 @@ Start the server
   herd open || php artisan serve
 ```
 
+## Run on Docker
+
+```bash
+  git clone https://github.com/arihant-getgrahak/weather-app-backend
+```
+
+Go to the project directory
+
+```bash
+  cd weather-app-backend
+```
+
+Go to Mysql Contaner
+```bash
+  docker exec -it mysql_db sh
+```
+Execute following command
+```bash
+  mysql -u root -p password01
+  create database laravel;
+  create user 'username'@'%' identified with 'password';
+  grant all on laravel.* to 'username'@'%';
+  flush privileges;
+```
+
+Go to laravel container
+```bash
+  docker exec -it app sh
+```
+Execute following command <br>
+Make sure to add .env file
+```bash
+  composer install
+  php artisan migrate
+```
+Go to browser and search localhost/api or your public IP/api
+
 ## Response Schema
 
 [Postman](https://www.postman.com/sonaljain01/workspace/weather-app-backend/request/37798694-41476040-32d3-4961-b41e-1d906ef645b5)
